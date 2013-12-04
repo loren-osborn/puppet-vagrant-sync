@@ -77,9 +77,9 @@ function propigateFileChanges {
 			done
 			(grep -Ev '^'$4/'('$((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}' | tr ' ' '|')')[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$' $5 ; cat $5"_newlyAdded") | sort > $5"_newlyFiltered"
 			if diff -u $5 $5"_newlyFiltered" | grep . > /dev/null ; then
+				echo $(date "+%c")" applying changes to "$5 >> $LOG_FILE
 			#	echo $(date "+%c")" aborting with debug information" >> $LOG_FILE
 			#	exit
-				;
 			elif [ $changeCount -gt 0 ] ; then
 				echo $(date "+%c")" INTERNAL ERROR... aborting, missing expected change to "$5"_newlyFiltered" >> $LOG_FILE
 			#	echo ran: '('simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted"')'| sort -u | perl -ne \''chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}'\' | tr "' '" "'|'"
