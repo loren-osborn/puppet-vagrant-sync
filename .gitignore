@@ -1,0 +1,7 @@
+*.swp
+*~
+.DS_Store
+.buildpath
+.idea
+.vagrant
+Thumbs.db
