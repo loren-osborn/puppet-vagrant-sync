@@ -13,9 +13,10 @@ class vagrant_sync (
 	  		Package['rsync'], 
 	  		Exec['initial copy from shared to local'],
 	  		File['/vagrant_local'],
-	  		File['/usr/local/bin/vagrant_sync'], 
+	  		File['/usr/local/sbin/vagrant_sync'], 
 	  		File['/etc/init.d/vagrant_sync'], 
 	  		File['/etc/default/vagrant_sync'] ],
+	  subscribe => File['/usr/local/sbin/vagrant_sync'], 
 	}
 
 	file {'/vagrant_local':
@@ -32,7 +33,7 @@ class vagrant_sync (
 	  		File['/vagrant_local'] ]
 	}
 
-	file {'/usr/local/bin/vagrant_sync':
+	file {'/usr/local/sbin/vagrant_sync':
 	  ensure => present,
 	  owner   => 'vagrant',
 	  group   => 'vagrant',

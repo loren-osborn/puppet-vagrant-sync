@@ -15,7 +15,7 @@ set -e
 
 # /etc/init.d/vagrant_sync: start and stop the bash vagrant_sync daemon
 
-DAEMON=/usr/local/bin/vagrant_sync
+DAEMON=/usr/local/sbin/vagrant_sync
 VAGRANT_SYNC_ENABLE=false
 VAGRANT_SYNC_OPTS=''
 VAGRANT_SYNC_DEFAULTS_FILE=/etc/default/vagrant_sync
