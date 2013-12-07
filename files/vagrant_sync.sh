@@ -19,12 +19,7 @@ HELP_RETURN_CODE=0
 KILL_MODE=0
 LAUNCH_DEAMON=$(echo 1 - 0$DEAMON_MODE | bc)
 UNEXPECTED_ARG_COUNT="-ne 0"
-ARGS_TO_PASS=(  )
 IO_NICE_LEVEL="-c 3"
-
-function quoteLines {
-	sed -e 's/^"?/"/' -e 's/"?\s*$/"/'
-} 
 
 function outputFileManifest {
 	ls -ad1l --time-style=+%s "$@"  | \
@@ -56,38 +51,37 @@ function propigateFileChanges {
 			# sort -r < $5"__changedFiles.del_tmp" > $5"__changedFilesSorted.del_tmp"
 			# grep '^-/' < $5"__changedFilesSorted.del_tmp" > $5"__changedFilesFiltered.del_tmp"
 			# sed -e "s,^-$1/,," < $5"__changedFilesFiltered.del_tmp" > $5"__changedFilesCleanedUp.del_tmp"
-			# quoteLines <  $5"__changedFilesCleanedUp.del_tmp" >  $5"__changedFilesQuoted.del_tmp"
-			# if [ -s $5"__changedFilesQuoted.del_tmp" ] ; then
+			# if [ -s $5"__changedFilesCleanedUp.del_tmp" ] ; then
 			# 	echo $(date "+%c")" aborting with debug information on detecting file deletion" >> $LOG_FILE
 			# 	exit
 			# fi
-			for file in $(diff -u <(simplifyFileManifest $2) <(simplifyFileManifest $3) | sort -r | grep '^-/' | sed -e "s,^-$1/,," 2> /dev/null | quoteLines ) ; do
+			while IFS= read -r file; do
 				rm -rf "$4/$file"
 				echo $file >> $5"_newlyDeleted"
 				echo $(date "+%c")" deleting $4/$file" >> $LOG_FILE
 				changeCount=$(echo $changeCount + 1 | bc)
-			done
+			done < <(diff -u <(simplifyFileManifest $2) <(simplifyFileManifest $3) | sort -r | grep '^-'$1/ | sed -e "s,^-$1/,," 2> /dev/null )
 			# diff -u $2 $3 > $5"__changedFiles.add_tmp"
 			# grep '^\+'$1/ < $5"__changedFiles.add_tmp" > $5"__changedFilesFiltered.add_tmp"
 			# simplifyFileManifest $5"__changedFilesFiltered.add_tmp" > $5"__changedFilesSimplified.add_tmp"
 			# sed -e "s,^\+$1/,," < $5"__changedFilesSimplified.add_tmp" > $5"__changedFilesCleanedUp.add_tmp"
-			# quoteLines <  $5"__changedFilesCleanedUp.add_tmp" >  $5"__changedFilesQuoted.add_tmp"
 			# if [ -s $5"__changedFilesCleanedUp.add_tmp" ] ; then
 			# 	echo $(date "+%c")" aborting with debug information on detecting file create/update" >> $LOG_FILE
 			#  	exit
 			# fi
-			for file in $(simplifyFileManifest <(diff -u $2 $3 | grep '^\+'$1/) | sed -e "s,^\+$1/,," | quoteLines) ; do
-				rsync --recursive --times --perms --links "$1/$file" "$(echo $4/$file | sed -e 's,[^/]*/*$,,' )" >> $LOG_FILE 2>> $LOG_FILE
+			while IFS= read -r file; do
+				rsync --recursive --perms --links "$1/$file" "$(echo $4/$file | sed -e 's,[^/]*/*$,,' )" >> $LOG_FILE 2>> $LOG_FILE
 				outputFileManifest "$4/$file" >> $5"_newlyAdded"
 				echo $(date "+%c")" creating/updating $4/$file" >> $LOG_FILE
 				changeCount=$(echo $changeCount + 1 | bc)
-			done
+			done < <(simplifyFileManifest <(diff -u $2 $3 | grep '^\+'$1/) | sed -e "s,^\+$1/,," )
 			cp $5 $5'_orig'
-			for file in $((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u | quoteLines) ; do
-				grep -Ev '^'$4/$(echo $file | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}')'[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$' $5 | sort > $5"_newlyFiltered"
+			while IFS= read -r file; do
+				grep -Pv '^'$4/$(echo $file | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}')'[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$' $5 | sort > $5"_newlyFiltered"
+				# echo grep -Pv \''^'$4/$(echo $file | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}')'[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$'\' $5 \| sort \> $5"_newlyFiltered"
 				mv $5"_newlyFiltered" $5
-			done
-			cat $5 $5"_newlyAdded" | sort | quoteLines > $5"_newlyFiltered"
+			done < <((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u )
+			cat $5 $5"_newlyAdded" | sort > $5"_newlyFiltered"
 			mv $5'_orig' $5
 			# if diff -u $5 $5"_newlyFiltered" | grep . > /dev/null ; then
 			# 	echo $(date "+%c")" aborting with debug information after amending $5 manifest" >> $LOG_FILE
@@ -96,13 +90,14 @@ function propigateFileChanges {
 			# 	echo $(date "+%c")" INTERNAL ERROR... aborting, missing expected change to "$5"_newlyFiltered" >> $LOG_FILE
 			# 	echo ran: '('simplifyFileManifest $5"_newlyAdded" ';' cat $5"_newlyDeleted"') |' sort -u '|' perl -ne \''chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}'\' '|' tr "' '" "'|'"
 			# 	echo with output: $((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}' | tr ' ' '|')
-			# 	echo ran: '('grep -Ev "'^'$4/'('"$((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}' | tr ' ' '|')\'')[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$'\' $5 ';' cat $5"_newlyAdded"') | sort | quoteLines '
+			# 	echo ran: '('grep -Pv "'^'$4/'('"$((simplifyFileManifest $5"_newlyAdded" ; cat $5"_newlyDeleted") | sort -u | perl -ne 'chop; if (/\S/) { print join("", map {(/^[_A-Za-z0-9]$/) ? $_ : sprintf("\\x%02x",ord($_))} (split //)) . "\n"}' | tr ' ' '|')\'')[ \t]+[0-9]+[ \t]+[0-9]+[ \t]+[^ \t]+[ \t]+[^ \t]+[ \t]+[-a-z]{10}$'\' $5 ';' cat $5"_newlyAdded"') | sort '
 			# 	echo with results in $5"_newlyFiltered"
 			# 	exit
 			# fi
 			if [ $(diff -u $5 $5"_newlyFiltered" | grep . -c) -eq 0  ] && [ $changeCount -gt 0 ] ; then
 				echo $(date "+%c")" INTERNAL ERROR... aborting, missing expected change to "$5"_newlyFiltered" >> $LOG_FILE
-				exit 3
+				# This can happen if some file property that we aren't transferring changes.
+				# exit 3
 			fi
 			# echo $(date "+%c")" aborting with debug information .. normal cycle end" >> $LOG_FILE
 			# exit
@@ -117,22 +112,19 @@ if [[ $# -gt 0 ]]; then
 	case "z$1" in
 	  "z-k" | "z--kill" ) \
 	  	KILL_MODE=1
+	  	LAUNCH_DEAMON=0
+	  	UNEXPECTED_ARG_COUNT="-ne 1";;
+	  "z-r" | "z--restart" ) \
+	  	KILL_MODE=1
+	  	LAUNCH_DEAMON=1
 	  	UNEXPECTED_ARG_COUNT="-ne 1";;
 	   "z-h" | "z--help" ) \
 	  	SHOW_HELP=1
 	  	UNEXPECTED_ARG_COUNT="-ne 1";;
-	  "z--" ) \
-	  	ARGS_TO_PASS=${@:2}
-	  	UNEXPECTED_ARG_COUNT="-lt 2";;
 	  "z-f" | "z--foreground" ) \
 	  	LAUNCH_DEAMON=0
 	  	LOG_FILE="/proc/$$/fd/1"
-		if [[ $# -gt 1 ]] && [[ "z$2" == "z--" ]]; then \
-	  		ARGS_TO_PASS=${@:3}
-			UNEXPECTED_ARG_COUNT="-lt 3"
-		else
-			UNEXPECTED_ARG_COUNT="-ne 1"
-		fi;;
+		UNEXPECTED_ARG_COUNT="-ne 1";;
 	  *) UNEXPECTED_ARG_COUNT=" != 'INVALID'";;
 	esac
 fi
@@ -149,8 +141,8 @@ if [ "$SHOW_HELP" -ne "0" ]; then
 	echo " "
 	echo "   -h | --help        Display this help message"
 	echo "   -k | --kill        Terminate an instance of $0 already running"
+	echo "   -r | --restart     Terminate and restart $0"
 	echo "   -f | --foreground  Run in foreground. (Do not run as a deamon)"
-	echo "   --                 All arguments after this passed through to csync2"
 	echo " "
 	exit $HELP_RETURN_CODE
 fi
@@ -162,28 +154,39 @@ if [ "$KILL_MODE" -ne "0" ]; then
 		then
 			echo "Killing $0 with pid $(cat $PID_FILE)"
 			kill -15 $(cat $PID_FILE)
-			exit 0;
+			while [ -r "$PID_FILE" ] && kill -0 $(cat $PID_FILE) ; do \
+				sleep 1
+			done
+			if [ -d $RUN_STATUS_DIR ] ; then \
+				echo "$0 didn't clean up after itself."
+				rm -rf $RUN_STATUS_DIR
+				exit 2;
+			fi
+			if [ "$LAUNCH_DEAMON" -eq "0" ]; then \
+				exit 0;
+			fi
 		else
 			echo "$0 with pid $(cat $PID_FILE) didn't clean up after itself."
 			rm -rf $RUN_STATUS_DIR
 			exit 2;
 		fi
-	else 
+	elif [ "$LAUNCH_DEAMON" -eq "0" ]; then \
 		echo "Failed to kill $0. It doesn't appear to be running."
 		exit 1
 	fi
 fi
 
 if [ "$LAUNCH_DEAMON" -ne "0" ]; then
-	if [ ${#ARGS_TO_PASS[@]} -gt 0 ] ; then \
-		DEAMON_MODE=1 $0 -- $ARGS_TO_PASS < /dev/null 2> /dev/null > $STARTUP_LOG_FILE &
-	else
-		DEAMON_MODE=1 $0 < /dev/null 2> /dev/null > $STARTUP_LOG_FILE &
-	fi
+	touch $STARTUP_LOG_FILE
+	DEAMON_MODE=1 $0 < /dev/null 2>&1 > $STARTUP_LOG_FILE &
 	sleep 3
 	cat $STARTUP_LOG_FILE
 	RESULT_CODE=$(cat $EXIT_CODE_FILE)
 	rm -f $STARTUP_LOG_FILE $EXIT_CODE_FILE
+	if [ "$LAUNCH_DEAMON" -eq "0" ]; then \
+		ls $PID_FILE 2>/dev/null >/dev/null && kill -0 $(cat $PID_FILE)
+		$RESULT_CODE=$?
+	fi
 	exit $RESULT_CODE;
 fi
 
@@ -226,7 +229,7 @@ trap "SIGNAL_RECEIVED=1 ; SLEEP_TIME=0" SIGTERM
 
 echo $(date "+%c")" starting $0 daemon..." >> $LOG_FILE
 
-rsync --recursive --times --perms --links $REMOTE_DIR/* $LOCAL_DIR >> $LOG_FILE 2>> $LOG_FILE
+rsync --recursive --perms --links $REMOTE_DIR/* $LOCAL_DIR >> $LOG_FILE 2>> $LOG_FILE
 rm -f \
 	$NEXT_REMOTE_FILE_MANIFEST                 $NEXT_LOCAL_FILE_MANIFEST \
 	$LAST_REMOTE_FILE_MANIFEST"_newlyDeleted"  $LAST_LOCAL_FILE_MANIFEST"_newlyDeleted" \
@@ -247,7 +250,7 @@ while [ "$SIGNAL_RECEIVED" -eq "0" ]; do
 	fi
 
 	propigateFileChanges $REMOTE_DIR $LAST_REMOTE_FILE_MANIFEST $NEXT_REMOTE_FILE_MANIFEST $LOCAL_DIR $LAST_LOCAL_FILE_MANIFEST
-	propigateFileChanges $LOCAL_DIR $LAST_LOCAL_FILE_MANIFEST $NEXT_LOCAL_FILE_MANIFEST $REMOTE_DIR $LAST_REMOTE_FILE_MANIFEST 
+	propigateFileChanges $LOCAL_DIR $LAST_LOCAL_FILE_MANIFEST $NEXT_LOCAL_FILE_MANIFEST $REMOTE_DIR $LAST_REMOTE_FILE_MANIFEST
 	
 	rm -f "$RUN_STATUS_DIR"/awaiting_resync_pids.txt
 	

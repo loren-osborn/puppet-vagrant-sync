@@ -3,15 +3,20 @@ class vagrant_sync (
 {
 	package { 'rsync':
 	  ensure => installed,
+	} -> exec { 'initial copy from shared to local':
+	  command => 'rsync --recursive --perms --links /vagrant/* /vagrant_local > /dev/null',
+	  require   => File['/vagrant_local'],
 	}
 
 	service { 'vagrant_sync':
 	  enable    => true,
 	  ensure    => running,
-	  hasstatus => true,
+	  status    => 'ls /tmp/vagrant_sync/vagrant_sync.pid 2>/dev/null >/dev/null && kill -0 $(cat /tmp/vagrant_sync/vagrant_sync.pid)',
+	  start    => '/usr/local/sbin/vagrant_sync',
+	  stop    => '/usr/local/sbin/vagrant_sync -k',
+	  restart    => '/usr/local/sbin/vagrant_sync -r',
 	  require   => [
-	  		Package['rsync'], 
-	  		Exec['initial copy from shared to local'],
+	  		Exec['initial copy from shared to local'], 
 	  		File['/vagrant_local'],
 	  		File['/usr/local/sbin/vagrant_sync'], 
 	  		File['/etc/init.d/vagrant_sync'], 
@@ -24,13 +29,6 @@ class vagrant_sync (
 	  owner   => 'vagrant',
 	  group   => 'vagrant',
 	  mode    => '0644',
-	}
-	
-	exec { 'initial copy from shared to local':
-	  command => 'rsync --recursive --times --perms --links /vagrant/* /vagrant_local > /dev/null',
-	  require   => [
-	  		Package['rsync'], 
-	  		File['/vagrant_local'] ]
 	}
 
 	file {'/usr/local/sbin/vagrant_sync':
