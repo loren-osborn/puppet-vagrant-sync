@@ -8,9 +8,10 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
     const ARCHIVE_FILE_NAME = 'vagrant_sync.phar';
     
 	private $projectPath;
+	private $runningCwd;
 
 	function __construct() {
-		$this->projectPath = dirname(dirname(__FILE__));
+		$this->projectPath = dirname(dirname(dirname(__FILE__)));
 	}
 	
 	private function recursiveUnlink($path, $ignoreMissing = true) {
@@ -77,15 +78,19 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 			}
     	}
     }
-   
+
     public function setUp()
     {
         $this->saveRealBuildDir();
+        $this->runningCwd = getcwd();
     }
    
     public function tearDown()
     {
         $this->restoreRealBuildDir();
+        if (!chdir($this->runningCwd)) {
+            throw new \Exception("Error restoring CWD to {$this->runningCwd}");
+        }
     }
  
     public function testSetupTeardown()
@@ -93,5 +98,15 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
         $this->assertTrue(is_dir($this->getRealBuildDirTempPath()), "Real build dir moved to " . $this->getRealBuildDirTempPath());
         $this->assertTrue(is_dir($this->getBuildDirPath()), "Fake build dir reated at " . $this->getBuildDirPath());
         $this->assertEquals(array('.', '..'), scandir($this->getBuildDirPath()), "Fake build dir empty");
+    }
+
+    public function testMakeGeneratesPhar()
+    {
+        $this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
+        if (!chdir($this->projectPath)) {
+            throw new \Exception("Error restoring CWD to {$this->projectPath}");
+        }
+        system("make build/vagrant_sync.phar 2> /dev/null > /dev/null");
+        $this->assertTrue(file_exists($this->getArchivePath()), "Archive file created");
     }
 }
