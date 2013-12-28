@@ -12,6 +12,7 @@ require_once "PHPUnit/Autoload.php";
 class ArchiveTest extends PHPUnit_Framework_TestCase
 {
 	const BUILD_DIR_NAME = 'build';
+	const SOURCE_DIR_NAME = 'source';
 	const TEMP_NAME_SUFFIX = '_real';
 	const ARCHIVE_FILE_NAME = 'vagrant_sync.phar';
 
@@ -133,11 +134,73 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 		if (!chdir($this->projectPath)) {
 			throw new Exception("Error setting CWD to {$this->projectPath}");
 		}
-		system("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME . " 2> /dev/null > /dev/null");
+		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
 		$this->assertTrue(file_exists($this->getArchivePath()), "Archive file created");
 		$pharFile = new Phar($this->getArchivePath());
 		$this->assertTrue($pharFile->isFileFormat(Phar::PHAR), "Archive file in correct format");
-		$pharInfo = new PharFileInfo($this->getArchivePathAsUrl() . '/run.php');
+		$pharInfo = new PharFileInfo($this->getArchivePathAsUrl() . '/autoloader.php');
 		$this->assertTrue($pharInfo->isCRCChecked(), "Archive file CRC matches");
+	}
+
+	public function testLauncher()
+	{
+		$this->saveRealDir(self::SOURCE_DIR_NAME);
+		foreach (array('stub.php', 'createPhar.php') as $file) {
+			if (!copy(
+				$this->getRealDirTempPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file,
+				$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file
+			)) {
+				throw new Exception("Error copying file $file");
+			}
+		}
+		$mockAutoloaderCode = <<<'MOCK_AUTOLOADER_EOF'
+<?php
+			echo '1';
+			if (!class_exists('LinuxDr\\VagrantSync\\Application\\Runner', false)) {
+				echo '2';
+			} else {
+				echo '*CLASS  LinuxDr\\VagrantSync\\Application\\Runner UNEXPECTEDLY EXISTS*';
+			}
+
+			function __autoload($class_name) {
+				echo '4';
+				if ($class_name == 'LinuxDr\\VagrantSync\\Application\\Runner') {
+					echo '5';
+					$class_def = <<<'MOCK_APP_RUNNER_EOF'
+						namespace LinuxDr\VagrantSync\Application;
+
+						echo '6';
+						class Runner
+						{
+							function __construct()
+							{
+								echo '*UNEXPECTED CONSTRUCTOR CALL*';
+							}
+
+							public static function launch($argList)
+							{
+								echo '9:' . join('.', $argList) . '';
+							}
+						}
+						echo '7';
+MOCK_APP_RUNNER_EOF;
+					eval($class_def);
+					echo '8';
+				} else {
+					echo '*UNEXPECTED CLASS AUTOLOAD: ' . $class_name . '*';
+				}
+			}
+			echo '3';
+MOCK_AUTOLOADER_EOF;
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'autoloader.php',
+			$mockAutoloaderCode
+		);
+		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
+		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
+		$testOupput = exec($this->getArchivePath() . " a bc def");
+		$this->assertEquals('123456789:' . $this->getArchivePath() . '.a.bc.def', $testOupput, "Expected stub output");
+		$testOupput = exec($this->getArchivePath() . " xyz");
+		$this->assertEquals('123456789:' . $this->getArchivePath() . '.xyz', $testOupput, "Expected stub output");
 	}
 }

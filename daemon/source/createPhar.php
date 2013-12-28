@@ -16,6 +16,7 @@ $phar = new Phar(
 	(FilesystemIterator::CURRENT_AS_FILEINFO | FilesystemIterator::KEY_AS_FILENAME),
 	$archiveName
 );
-$phar["run.php"] = file_get_contents($srcRoot . DIRECTORY_SEPARATOR . "run.php");
 $phar["autoloader.php"] = file_get_contents($srcRoot . DIRECTORY_SEPARATOR . "autoloader.php");
-$phar->setStub($phar->createDefaultStub("run.php"));
+$phar->setStub(file_get_contents($srcRoot . DIRECTORY_SEPARATOR . "stub.php"));
+
+chmod($archivePath, 0755);
