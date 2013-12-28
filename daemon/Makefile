@@ -4,7 +4,7 @@ run_test: build/vagrant_sync.phar
 	phpunit
 
 build/vagrant_sync.phar: $(SOURCE_FILES)
-	touch build/vagrant_sync.phar
+	php -d phar.readonly=0 source/createPhar.php
 
 clean:
 	rm -rf build
