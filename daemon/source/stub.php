@@ -3,7 +3,7 @@
 
 use LinuxDr\VagrantSync\Application\Runner;
 
-require_once "phar://vagrant_sync.phar/autoloader.php";
+require_once 'phar://' . __FILE__ . '/autoloader.php';
 
 Runner::launch($argv);
 
