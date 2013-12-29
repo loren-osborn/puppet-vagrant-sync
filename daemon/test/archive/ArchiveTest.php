@@ -203,4 +203,59 @@ MOCK_AUTOLOADER_EOF;
 		$testOupput = exec($this->getArchivePath() . " xyz");
 		$this->assertEquals('123456789:' . $this->getArchivePath() . '.xyz', $testOupput, "Expected stub output");
 	}
+
+	public function testAutoloader()
+	{
+		$this->saveRealDir(self::SOURCE_DIR_NAME);
+		foreach (array('stub.php', 'autoloader.php', 'createPhar.php') as $file) {
+			if (!copy(
+				$this->getRealDirTempPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file,
+				$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file
+			)) {
+				throw new Exception("Error copying file $file");
+			}
+		}
+		$mockRunnerCode = <<<'MOCK_APP_RUNNER_EOF'
+			namespace LinuxDr\VagrantSync\Application;
+
+			echo '1';
+			class Runner
+			{
+				public static function launch($argList)
+				{
+					echo '3';
+					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(6);
+					echo '7';
+				}
+			}
+			echo '2';
+MOCK_APP_RUNNER_EOF;
+		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Application', 0755, true);
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Application/Runner.php',
+			$mockRunnerCode
+		);
+		$deeplyNestedTestCode = <<<'DEEPLY_NESTED_TEST_EOF'
+			namespace LinuxDr\VagrantSync\Nested\Deeply;
+
+			echo '4';
+			class TestClass
+			{
+				function __construct($val)
+				{
+					echo $val;
+				}
+			}
+			echo '5';
+DEEPLY_NESTED_TEST_EOF;
+		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply', 0755, true);
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply/TestClass.php',
+			$deeplyNestedTestCode
+		);
+		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
+		system("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
+		$testOupput = exec($this->getArchivePath());
+		$this->assertEquals('1234567', $testOupput, "Expected stub output");
+	}
 }
