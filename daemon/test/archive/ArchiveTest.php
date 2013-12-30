@@ -6,6 +6,7 @@ use Phar;
 use Exception;
 use DirectoryIterator;
 use PharFileInfo;
+use RecursiveIteratorIterator;
 
 require_once "PHPUnit/Autoload.php";
 
@@ -265,5 +266,24 @@ DEEPLY_NESTED_TEST_EOF;
 		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
 		$testOupput = exec($this->getArchivePath());
 		$this->assertEquals('12345678', $testOupput, "Expected stub output");
+	}
+
+	public function testCompressedAndSigned()
+	{
+		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
+		$phar = new Phar($this->getArchivePath());
+		$pharIterator = new RecursiveIteratorIterator($phar, RecursiveIteratorIterator::CHILD_FIRST);
+
+		foreach ($pharIterator as $pharFileInfo) {
+			if (substr($pharFileInfo->getPathname(), -4) === '.php') {
+				$this->assertFalse($pharFileInfo->isDir(), "Not a directory");
+				$this->assertTrue($pharFileInfo->isCompressed(Phar::BZ2), "BZip2 Compressed");
+			} else {
+				$this->assertTrue($pharFileInfo->isDir(), "Directory");
+			}
+		}
+		$signature = $phar->getSignature();
+		$this->assertEquals('SHA-512', $signature['hash_type'], "verify hash type");
+		$this->assertEquals(128, strlen($signature['hash']), "verify hash type");
 	}
 }

@@ -21,9 +21,11 @@ $phar = new Phar(
 	(FilesystemIterator::CURRENT_AS_FILEINFO | FilesystemIterator::KEY_AS_FILENAME),
 	$archiveName
 );
-$phar->compressFiles(Phar::BZ2);
+$phar->startBuffering();
 $phar->setSignatureAlgorithm(Phar::SHA512);
 $phar->setStub(file_get_contents($srcRoot . DIRECTORY_SEPARATOR . "stub.php"));
 $phar->buildFromDirectory($srcRoot, ',/(autoloader|namespace/.*)\.php$,');
+$phar->compressFiles(Phar::BZ2);
+$phar->stopBuffering();
 
 chmod($archivePath, 0755);
