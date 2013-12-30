@@ -172,14 +172,14 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 						echo '6';
 						class Runner
 						{
-							function __construct()
-							{
-								echo '*UNEXPECTED CONSTRUCTOR CALL*';
-							}
-
-							public static function launch($argList)
+							function __construct($argList)
 							{
 								echo '9:' . join('.', $argList) . '';
+							}
+
+							public function launch()
+							{
+								echo '0';
 							}
 						}
 						echo '7';
@@ -199,9 +199,9 @@ MOCK_AUTOLOADER_EOF;
 		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
 		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
 		$testOupput = exec($this->getArchivePath() . " a bc def");
-		$this->assertEquals('123456789:' . $this->getArchivePath() . '.a.bc.def', $testOupput, "Expected stub output");
+		$this->assertEquals('123456789:' . $this->getArchivePath() . '.a.bc.def0', $testOupput, "Expected stub output");
 		$testOupput = exec($this->getArchivePath() . " xyz");
-		$this->assertEquals('123456789:' . $this->getArchivePath() . '.xyz', $testOupput, "Expected stub output");
+		$this->assertEquals('123456789:' . $this->getArchivePath() . '.xyz0', $testOupput, "Expected stub output");
 	}
 
 	public function testAutoloader()
@@ -222,11 +222,17 @@ MOCK_AUTOLOADER_EOF;
 			echo '1';
 			class Runner
 			{
-				public static function launch($argList)
+
+				public function __construct($argList)
 				{
 					echo '3';
-					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(6);
-					echo '7';
+				}
+
+				public function launch()
+				{
+					echo '4';
+					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(7);
+					echo '8';
 				}
 			}
 			echo '2';
@@ -240,7 +246,7 @@ MOCK_APP_RUNNER_EOF;
 <?php
 			namespace LinuxDr\VagrantSync\Nested\Deeply;
 
-			echo '4';
+			echo '5';
 			class TestClass
 			{
 				function __construct($val)
@@ -248,7 +254,7 @@ MOCK_APP_RUNNER_EOF;
 					echo $val;
 				}
 			}
-			echo '5';
+			echo '6';
 DEEPLY_NESTED_TEST_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply', 0755, true);
 		file_put_contents(
@@ -258,6 +264,6 @@ DEEPLY_NESTED_TEST_EOF;
 		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
 		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
 		$testOupput = exec($this->getArchivePath());
-		$this->assertEquals('1234567', $testOupput, "Expected stub output");
+		$this->assertEquals('12345678', $testOupput, "Expected stub output");
 	}
 }

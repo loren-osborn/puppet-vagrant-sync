@@ -3,7 +3,11 @@ namespace LinuxDr\VagrantSync\Application;
 
 class Runner
 {
-	public static function launch()
+	public function __construct($argList)
+	{
+	}
+
+	public function launch()
 	{
 	}
 }
