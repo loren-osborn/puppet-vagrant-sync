@@ -5,3 +5,6 @@
 .idea
 .vagrant
 Thumbs.db
+daemon/vendor
+daemon/composer.phar
+daemon/build

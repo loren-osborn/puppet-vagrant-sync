@@ -121,17 +121,17 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 		}
 	}
 
-	public function testSetupTeardown()
-	{
+    public function assertPreConditions()
+    {
 		$this->assertTrue(is_dir($this->getRealDirTempPath(self::BUILD_DIR_NAME)), "Real build dir moved to " . $this->getRealDirTempPath(self::BUILD_DIR_NAME));
 		$this->assertTrue(is_dir($this->getDirPath(self::BUILD_DIR_NAME)), "Fake build dir reated at " . $this->getDirPath(self::BUILD_DIR_NAME));
 		$this->assertEquals(array('.', '..'), scandir($this->getDirPath(self::BUILD_DIR_NAME)), "Fake build dir empty");
-	}
+		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
+		$this->assertTrue(Phar::isValidPharFilename($this->getArchivePath()), "Archive filename is valid");
+    }
 
 	public function testMakeGeneratesPhar()
 	{
-		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
-		$this->assertTrue(Phar::isValidPharFilename($this->getArchivePath()), "Archive filename is valid");
 		if (!chdir($this->projectPath)) {
 			throw new Exception("Error setting CWD to {$this->projectPath}");
 		}
@@ -143,7 +143,7 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 		$this->assertTrue($pharInfo->isCRCChecked(), "Archive file CRC matches");
 	}
 
-	public function testLauncher()
+	public function testStub()
 	{
 		$this->saveRealDir(self::SOURCE_DIR_NAME);
 		foreach (array('stub.php', 'createPhar.php') as $file) {
