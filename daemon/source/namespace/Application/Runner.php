@@ -18,8 +18,11 @@ class Runner
 
 	private function parseArguments($argList)
 	{
-		$this->parsedArgs = array('valid' => (count($argList) <= 2), 'executable' => $argList[0]);
-		$validSwitches = array('kill', 'restart', 'help', 'forground');
+		$this->parsedArgs = array(
+			'valid' => (count($argList) <= 2),
+			'executable' => $argList[0],
+			'arg_list' => join(' ', array_slice($argList, 1)));
+		$validSwitches = array('help', 'kill', 'restart', 'foreground');
 		$validShortSwitches = array_map('chr', array_map('ord', $validSwitches));
 		$optionIndex = null;
 		if ((count($argList) == 2) && $this->parsedArgs['valid']) {
@@ -50,5 +53,44 @@ class Runner
 			throw new InvalidArgumentException("Option $name not defined!");
 		}
 		return $this->parsedArgs[$name];
+	}
+
+	public function getStartupMessage()
+	{
+		$retVal = '';
+		$progName = $this->getOption('executable');
+		if ( $this->shouldTerminatOnStartup() ) {
+			$helpMessage = <<<HELP_MESSAGE_EOF
+{$progName}  --  keep vagrant shared directory shared to local mirror
+
+   -h | --help        Display this help message
+   -k | --kill        Terminate an instance of {$progName} already running
+   -r | --restart     Terminate and restart {$progName}
+   -f | --foreground  Run in foreground. (Do not run as a deamon)
+
+
+HELP_MESSAGE_EOF;
+			if (!$this->getOption('valid')) {
+				$helpMessage =
+					"Unrecognized arguments: " . $this->getOption('arg_list') . "\n\n" .
+					$helpMessage;
+			}
+			$retVal = $helpMessage;
+		}
+		return $retVal;
+	}
+
+	public function shouldTerminatOnStartup()
+	{
+		return (!$this->getOption('valid')) || $this->getOption('help');
+	}
+
+	public function getExitCode()
+	{
+		$retVal = null;
+		if ( $this->shouldTerminatOnStartup() ) {
+			$retVal = ($this->getOption('valid') ? 0 : 1);
+		}
+		return $retVal;
 	}
 }
