@@ -24,7 +24,7 @@ $phar = new Phar(
 $phar->startBuffering();
 $phar->setSignatureAlgorithm(Phar::SHA512);
 $phar->setStub(file_get_contents($srcRoot . DIRECTORY_SEPARATOR . "stub.php"));
-$phar->buildFromDirectory($srcRoot, ',/(autoloader|namespace/.*)\.php$,');
+$phar->buildFromDirectory($srcRoot, ',/(vendor/.*|(autoloader|namespace/.*)\.php)$,');
 $phar->compressFiles(Phar::BZ2);
 $phar->stopBuffering();
 

@@ -146,7 +146,7 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 	public function testStub()
 	{
 		$this->saveRealDir(self::SOURCE_DIR_NAME);
-		foreach (array('stub.php', 'createPhar.php') as $file) {
+		foreach (array('stub.php', 'createPhar.php', 'composer.json', 'composer.lock') as $file) {
 			if (!copy(
 				$this->getRealDirTempPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file,
 				$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . $file
@@ -220,6 +220,8 @@ MOCK_AUTOLOADER_EOF;
 <?php
 			namespace LinuxDr\VagrantSync\Application;
 
+			use Acme\Widget\Module\SomeClass;
+
 			echo '1';
 			class Runner
 			{
@@ -234,6 +236,7 @@ MOCK_AUTOLOADER_EOF;
 					echo '4';
 					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(7);
 					echo '8';
+					$other = new SomeClass(11);
 				}
 			}
 			echo '2';
@@ -262,10 +265,34 @@ DEEPLY_NESTED_TEST_EOF;
 			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply/TestClass.php',
 			$deeplyNestedTestCode
 		);
+		$otherVendorTestCode = <<<'OTHER_VENDOR_TEST_EOF'
+<?php
+			namespace Acme\Widget\Module;
+
+			echo '9';
+			class SomeClass
+			{
+				function __construct($val)
+				{
+					echo $val;
+					echo file_get_contents(dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'acme_file.data');
+				}
+			}
+			echo '10';
+OTHER_VENDOR_TEST_EOF;
+		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/Module', 0755, true);
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/Module/SomeClass.php',
+			$otherVendorTestCode
+		);
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/acme_file.data',
+			'red:green:blue'
+		);
 		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
-		exec("make " . self::BUILD_DIR_NAME . DIRECTORY_SEPARATOR . self::ARCHIVE_FILE_NAME);
+		exec("php -d phar.readonly=0 source/createPhar.php");
 		$testOupput = exec($this->getArchivePath());
-		$this->assertEquals('12345678', $testOupput, "Expected stub output");
+		$this->assertEquals('1234567891011red:green:blue', $testOupput, "Expected stub output");
 	}
 
 	public function testCompressedAndSigned()
@@ -275,11 +302,16 @@ DEEPLY_NESTED_TEST_EOF;
 		$pharIterator = new RecursiveIteratorIterator($phar, RecursiveIteratorIterator::CHILD_FIRST);
 
 		foreach ($pharIterator as $pharFileInfo) {
-			if (substr($pharFileInfo->getPathname(), -4) === '.php') {
-				$this->assertFalse($pharFileInfo->isDir(), "Not a directory");
-				$this->assertTrue($pharFileInfo->isCompressed(Phar::BZ2), "BZip2 Compressed");
-			} else {
-				$this->assertTrue($pharFileInfo->isDir(), "Directory");
+			if (!$pharFileInfo->isDir()) {
+				$this->assertTrue($pharFileInfo->isCompressed(Phar::BZ2), $pharFileInfo->getPathname() . " is BZip2 Compressed");
+			}
+			if (!preg_match(',/vendor/,', $pharFileInfo->getPathname())) {
+				if (substr($pharFileInfo->getPathname(), -4) === '.php') {
+					$this->assertFalse($pharFileInfo->isDir(), $pharFileInfo->getPathname() . " is not a directory");
+					$this->assertTrue($pharFileInfo->isCompressed(Phar::BZ2), $pharFileInfo->getPathname() . " is BZip2 Compressed");
+				} else {
+					$this->assertTrue($pharFileInfo->isDir(), $pharFileInfo->getPathname() . " is a Directory");
+				}
 			}
 		}
 		$signature = $phar->getSignature();

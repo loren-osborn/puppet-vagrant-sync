@@ -1,0 +1,71 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at http://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file"
+    ],
+    "hash": "37f029750aafbe3407eb7e91513540f4",
+    "packages": [
+        {
+            "name": "liip/process-manager",
+            "version": "1.0.0",
+            "target-dir": "Liip/ProcessManager",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/liip/LiipProcessManager.git",
+                "reference": "33f171608539e6ba71fdd126d744c1432c853e21"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/liip/LiipProcessManager/zipball/33f171608539e6ba71fdd126d744c1432c853e21",
+                "reference": "33f171608539e6ba71fdd126d744c1432c853e21",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.3.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-0": {
+                    "Liip\\ProcessManager": ""
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Community contributions",
+                    "homepage": "https://github.com/liip/LiipThemeBundle/contributors"
+                },
+                {
+                    "name": "Liip AG",
+                    "homepage": "http://www.liip.ch/"
+                }
+            ],
+            "description": "Provides a simple locking mechanism based on UNIX process id's written to a PID file.",
+            "keywords": [
+                "locking",
+                "pid",
+                "unix"
+            ],
+            "time": "2013-09-30 13:14:11"
+        }
+    ],
+    "packages-dev": [
+
+    ],
+    "aliases": [
+
+    ],
+    "minimum-stability": "stable",
+    "stability-flags": [
+
+    ],
+    "platform": [
+
+    ],
+    "platform-dev": [
+
+    ]
+}

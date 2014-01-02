@@ -6,5 +6,6 @@
 .vagrant
 Thumbs.db
 daemon/vendor
+daemon/source/vendor
 daemon/composer.phar
 daemon/build
