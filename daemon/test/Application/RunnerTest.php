@@ -5,6 +5,7 @@ use PHPUnit_Framework_TestCase;
 use Exception;
 use LinuxDr\VagrantSync\Application\Runner;
 use LinuxDr\VagrantSync\Application\InvalidArgumentException;
+use LinuxDr\VagrantSync\Application\InternalErrorException;
 
 require_once "PHPUnit/Autoload.php";
 require_once 'phar://' . dirname(dirname(dirname(__FILE__))) . "/build/vagrant_sync.phar/namespace/Application/Runner.php";
@@ -302,51 +303,109 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 			// Normal silent, no-exit startup
 			array(
 				'input' => array('foo'),
-				'output' => array('startup_message' => '', 'terminate_at_startup' => false, 'exit_status' => null)),
+				'output' => array(
+					'getStartupMessage' => '',
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => false,
+					'shouldStartInForeground' => false),
+				'invalidKeys' => array('requireProcessToKill', 'getExitCode')),
 			array(
 				'input' => array('bar', '--kill'),
-				'output' => array('startup_message' => '', 'terminate_at_startup' => false, 'exit_status' => null)),
+				'output' => array(
+					'getStartupMessage' => '',
+					'shouldKillBackgroundProcess' => true,
+					'requireProcessToKill' => true,
+					'shouldTerminatOnStartup' => true,
+					'getExitCode' => 0),
+				'invalidKeys' => array('shouldStartInForeground')),
 			array(
 				'input' => array('baz', '--restart'),
-				'output' => array('startup_message' => '', 'terminate_at_startup' => false, 'exit_status' => null)),
+				'output' => array(
+					'getStartupMessage' => '',
+					'shouldKillBackgroundProcess' => true,
+					'requireProcessToKill' => false,
+					'shouldTerminatOnStartup' => false,
+					'shouldStartInForeground' => false),
+				'invalidKeys' => array('getExitCode')),
 			array(
 				'input' => array('bah', '--foreground'),
-				'output' => array('startup_message' => '', 'terminate_at_startup' => false, 'exit_status' => null)),
+				'output' => array(
+					'getStartupMessage' => '',
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => false,
+					'shouldStartInForeground' => true),
+				'invalidKeys' => array('requireProcessToKill', 'getExitCode')),
 			// Display help, no error
 			array(
 				'input' => array('apple', '--help'),
-				'output' => array('startup_message' => join('apple', $helpMessageParts), 'terminate_at_startup' => true, 'exit_status' => 0)),
+				'output' => array(
+					'getStartupMessage' => join('apple', $helpMessageParts),
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => true,
+					'getExitCode' => 0),
+				'invalidKeys' => array('requireProcessToKill', 'shouldStartInForeground')),
 			array(
 				'input' => array('banana', '-h'),
-				'output' => array('startup_message' => join('banana', $helpMessageParts), 'terminate_at_startup' => true, 'exit_status' => 0)),
+				'output' => array(
+					'getStartupMessage' => join('banana', $helpMessageParts),
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => true,
+					'getExitCode' => 0),
+				'invalidKeys' => array('requireProcessToKill', 'shouldStartInForeground')),
 			// Error condition, display help
 			array(
 				'input' => array('carrot', '--invalid'),
 				'output' => array(
-					'startup_message' =>
+					'getStartupMessage' =>
 						$beforeBadArgs . '--invalid' . $afterBadArgs .
 						join('carrot', $helpMessageParts),
-					'terminate_at_startup' => true,
-					'exit_status' => 1)),
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => true,
+					'getExitCode' => 1),
+				'invalidKeys' => array('requireProcessToKill', 'shouldStartInForeground')),
 			array(
 				'input' => array('dinosaur', 'doc', 'dopey', 'sneezy', 'sleepy', 'grumpy', 'bashful', 'happy'),
 				'output' => array(
-					'startup_message' =>
+					'getStartupMessage' =>
 						$beforeBadArgs . 'doc dopey sneezy sleepy grumpy bashful happy' . $afterBadArgs .
 						join('dinosaur', $helpMessageParts),
-					'terminate_at_startup' => true,
-					'exit_status' => 1))
+					'shouldKillBackgroundProcess' => false,
+					'shouldTerminatOnStartup' => true,
+					'getExitCode' => 1),
+				'invalidKeys' => array('requireProcessToKill', 'shouldStartInForeground'))
 		);
 	}
 
 	/**
 	* @dataProvider getExpectedStartupBehavior
 	*/
-	public function testStartupBehavior($input, $output)
+	public function testStartupBehavior($input, $output, $invalidKeys)
 	{
+		// validate expected values
+		$this->assertEquals($output['shouldKillBackgroundProcess'], in_array('requireProcessToKill', array_keys($output)), "validate requireProcessToKill");
+		$this->assertEquals(!$output['shouldKillBackgroundProcess'], in_array('requireProcessToKill', $invalidKeys), "validate requireProcessToKill");
+		$this->assertEquals($output['shouldTerminatOnStartup'], in_array('getExitCode', array_keys($output)), "validate getExitCode");
+		$this->assertEquals(!$output['shouldTerminatOnStartup'], in_array('getExitCode', $invalidKeys), "validate getExitCode");
+		$this->assertEquals(!$output['shouldTerminatOnStartup'], in_array('shouldStartInForeground', array_keys($output)), "validate shouldStartInForeground");
+		$this->assertEquals($output['shouldTerminatOnStartup'], in_array('shouldStartInForeground', $invalidKeys), "validate shouldStartInForeground");
+		// test runner
 		$testRunner = new Runner($input);
-		$this->assertEquals($output['startup_message'], $testRunner->getStartupMessage(), "expected startup message");
-		$this->assertSame($output['terminate_at_startup'], $testRunner->shouldTerminatOnStartup(), "should terminate?");
-		$this->assertSame($output['exit_status'], $testRunner->getExitCode(), "exit status?");
+		foreach ($output as $method => $value) {
+			try {
+				$this->assertEquals($value, $testRunner->$method(), "expected value for $method should be " . var_export($value, true));
+			}
+			catch (Exception $unexpected) {
+				$this->fail("Raised exception " . $unexpected->__toString() . " when requesting {$method}() that should have had value: " . var_export($value, true));
+			}
+		}
+		foreach ($invalidKeys as $invalid) {
+			try {
+				$testRunner->$invalid();
+				$this->fail("Calling method $invalid should raise an exception");
+			}
+			catch (InternalErrorException $expected) {
+				$this->assertTrue(true, 'expected exception');
+			}
+		}
 	}
 }

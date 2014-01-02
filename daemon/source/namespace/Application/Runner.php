@@ -7,6 +7,14 @@ class InvalidArgumentException extends Exception
 {
 }
 
+class InternalErrorException extends Exception
+{
+	public function __construct($message, $code = 0, $previous = null)
+	{
+		parent::__construct('Internal Error: ' . $message, $code, $previous);
+	}
+}
+
 class Runner
 {
 	private $parsedArgs;
@@ -59,7 +67,7 @@ class Runner
 	{
 		$retVal = '';
 		$progName = $this->getOption('executable');
-		if ( $this->shouldTerminatOnStartup() ) {
+		if ( (!$this->getOption('valid')) || $this->getOption('help') ) {
 			$helpMessage = <<<HELP_MESSAGE_EOF
 {$progName}  --  keep vagrant shared directory shared to local mirror
 
@@ -82,15 +90,35 @@ HELP_MESSAGE_EOF;
 
 	public function shouldTerminatOnStartup()
 	{
-		return (!$this->getOption('valid')) || $this->getOption('help');
+		return (!$this->getOption('valid')) || $this->getOption('help') || $this->getOption('kill');
 	}
 
 	public function getExitCode()
 	{
-		$retVal = null;
-		if ( $this->shouldTerminatOnStartup() ) {
-			$retVal = ($this->getOption('valid') ? 0 : 1);
+		if (!$this->shouldTerminatOnStartup()) {
+			throw new InternalErrorException("only valid if terminating on startup");
 		}
-		return $retVal;
+		return ($this->getOption('valid') ? 0 : 1);
+	}
+
+	public function shouldKillBackgroundProcess()
+	{
+		return $this->getOption('valid') && (($this->getOption('kill')) || $this->getOption('restart'));
+	}
+
+	public function shouldStartInForeground()
+	{
+		if ($this->shouldTerminatOnStartup()) {
+			throw new InternalErrorException("only valid if not terminating on startup");
+		}
+		return $this->getOption('foreground');
+	}
+
+	public function requireProcessToKill()
+	{
+		if (!$this->shouldKillBackgroundProcess()) {
+			throw new InternalErrorException("only valid if background process should be killed");
+		}
+		return $this->getOption('kill');
 	}
 }
