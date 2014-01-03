@@ -222,24 +222,24 @@ MOCK_AUTOLOADER_EOF;
 
 			use Acme\Widget\Module\SomeClass;
 
-			echo '1';
+			echo '3';
 			class Runner
 			{
 
 				public function __construct($argList)
 				{
-					echo '3';
+					echo '5';
 				}
 
 				public function launch()
 				{
-					echo '4';
-					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(7);
-					echo '8';
-					$other = new SomeClass(11);
+					echo '6';
+					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(9);
+					echo '10';
+					$other = new SomeClass(15);
 				}
 			}
-			echo '2';
+			echo '4';
 MOCK_APP_RUNNER_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Application', 0755, true);
 		file_put_contents(
@@ -250,7 +250,7 @@ MOCK_APP_RUNNER_EOF;
 <?php
 			namespace LinuxDr\VagrantSync\Nested\Deeply;
 
-			echo '5';
+			echo '7';
 			class TestClass
 			{
 				function __construct($val)
@@ -258,7 +258,7 @@ MOCK_APP_RUNNER_EOF;
 					echo $val;
 				}
 			}
-			echo '6';
+			echo '8';
 DEEPLY_NESTED_TEST_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply', 0755, true);
 		file_put_contents(
@@ -269,7 +269,7 @@ DEEPLY_NESTED_TEST_EOF;
 <?php
 			namespace Acme\Widget\Module;
 
-			echo '9';
+			echo '12';
 			class SomeClass
 			{
 				function __construct($val)
@@ -278,7 +278,7 @@ DEEPLY_NESTED_TEST_EOF;
 					echo file_get_contents(dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'acme_file.data');
 				}
 			}
-			echo '10';
+			echo '13';
 OTHER_VENDOR_TEST_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/Module', 0755, true);
 		file_put_contents(
@@ -289,10 +289,38 @@ OTHER_VENDOR_TEST_EOF;
 			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/acme_file.data',
 			'red:green:blue'
 		);
+		$mockComposerAutoloaderCode = <<<'MOCK_COMPOSER_AUTOLOADER_EOF'
+<?php
+			echo '1';
+			if (class_exists('Acme\\Widget\\Module\\SomeClass', false)) {
+				throw new \Exception("class should not exist yet");
+			}
+			spl_autoload_register(function ($className)
+				{
+					echo '11';
+					if ($className != 'Acme\\Widget\\Module\\SomeClass') {
+						throw new \Exception("autoloading unexpected class");
+					}
+					$pathToLoad = Phar::running() . '/vendor//Acme/Widget/Module/SomeClass.php';
+					if (!file_exists($pathToLoad)) {
+						throw new \Exception("class file missing from Phar");
+					}
+					include $pathToLoad;
+					if (!class_exists('Acme\\Widget\\Module\\SomeClass', false)) {
+						throw new \Exception("class should exist now");
+					}
+					echo '14';
+				});
+			echo '2';
+MOCK_COMPOSER_AUTOLOADER_EOF;
+		file_put_contents(
+			$this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/autoload.php',
+			$mockComposerAutoloaderCode
+		);
 		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
 		exec("php -d phar.readonly=0 source/createPhar.php");
 		$testOupput = exec($this->getArchivePath());
-		$this->assertEquals('1234567891011red:green:blue', $testOupput, "Expected stub output");
+		$this->assertEquals('123456789101112131415red:green:blue', $testOupput, "Expected stub output");
 	}
 
 	public function testCompressedAndSigned()

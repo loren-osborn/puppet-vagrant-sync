@@ -3,7 +3,6 @@
 spl_autoload_register(function ($className)
 	{
 		$applicationFileNamePrefix  = Phar::running() . '/namespace/';
-		$vendorFileNamePrefix  = Phar::running() . '/vendor/';
 		$namespacePrefix = 'LinuxDr\\VagrantSync\\';
 		$fileName 	= '';
 		$namespace = '';
@@ -15,12 +14,12 @@ spl_autoload_register(function ($className)
 		$fileName .= str_replace('_', DIRECTORY_SEPARATOR, $className) . '.php';
 		if ($namespacePrefix === substr($namespace . '\\', 0, strlen($namespacePrefix))) {
 			$pathToLoad = $applicationFileNamePrefix . substr($fileName, strlen($namespacePrefix));
-		} else {
-			$pathToLoad = $vendorFileNamePrefix . $fileName;
-		}
-		if (file_exists($pathToLoad)) {
-			include $pathToLoad;
-		} else {
-			throw new Exception("Missing file $pathToLoad");
+			if (file_exists($pathToLoad)) {
+				include $pathToLoad;
+			} else {
+				throw new Exception("Missing file $pathToLoad");
+			}
 		}
 	});
+
+require_once Phar::running() . '/vendor/autoload.php';
