@@ -53,6 +53,8 @@ class Runner
 
 	public function launch()
 	{
+		echo $this->getStartupMessage();
+		exit ($this->getExitCode());
 	}
 
 	public function getOption($name)

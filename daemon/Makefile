@@ -21,5 +21,5 @@ $(COMPOSER_DEPENDANCY):
 	curl -sS https://getcomposer.org/installer | php
 
 clean:
-	rm -rf build vendor composer.phar
+	rm -rf build vendor source/vendor composer.phar
 	mkdir build

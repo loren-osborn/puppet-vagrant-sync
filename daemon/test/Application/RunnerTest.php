@@ -408,4 +408,49 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 			}
 		}
 	}
+
+	public function getExpectedStartupBehaviorsWithoutSideEffects()
+	{
+		$archivePath =
+			dirname(dirname(dirname(__FILE__))) . DIRECTORY_SEPARATOR .
+			'build' . DIRECTORY_SEPARATOR .
+			'vagrant_sync.phar';
+		$inputDataSet = $this->getExpectedStartupBehavior();
+		$retVal = array();
+		foreach ($inputDataSet as $internalDataItem) {
+			if (
+				$internalDataItem['output']['shouldTerminatOnStartup'] &&
+				!$internalDataItem['output']['shouldKillBackgroundProcess']
+			) {
+				$externalDataItem = array();
+				$externalDataItem['command'] = implode(
+					' ',
+					array_merge(
+						array($archivePath),
+						array_slice($internalDataItem['input'], 1)
+					)
+				);
+				$externalDataItem['startupMessage'] = str_replace(
+					$internalDataItem['input'][0],
+					$archivePath,
+					$internalDataItem['output']['getStartupMessage']
+				);
+				$externalDataItem['exitCode'] = $internalDataItem['output']['getExitCode'];
+				$retVal[] = $externalDataItem;
+			}
+		}
+		return $retVal;
+	}
+
+	/**
+	* @dataProvider getExpectedStartupBehaviorsWithoutSideEffects
+	*/
+	public function testActualNonDestructiveStartup($command, $startupMessage, $exitCode)
+	{
+		$handle = popen($command, 'r');
+		$output = fread($handle, strlen($startupMessage) + 1024);
+		$status = pclose($handle);
+		$this->assertEquals($startupMessage, $output, "expected output '$startupMessage' was actually '$startupMessage'");
+		$this->assertEquals($exitCode, $status, "expected exit code '$exitCode' was actually '$status'");
+	}
 }
