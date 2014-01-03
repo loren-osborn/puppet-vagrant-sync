@@ -154,6 +154,7 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 				throw new Exception("Error copying file $file");
 			}
 		}
+		exec("cp -R " . $this->getRealDirTempPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . "vendor " . $this->getDirPath(self::SOURCE_DIR_NAME));
 		$mockAutoloaderCode = <<<'MOCK_AUTOLOADER_EOF'
 <?php
 			echo '1';

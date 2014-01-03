@@ -22,4 +22,4 @@ spl_autoload_register(function ($className)
 		}
 	});
 
-require_once Phar::running() . '/vendor/autoload.php';
+require_once dirname(__FILE__) . '/vendor/autoload.php';
