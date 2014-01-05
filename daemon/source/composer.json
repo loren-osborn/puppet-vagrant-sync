@@ -1,5 +1,5 @@
 {
     "require": {
-        "liip/process-manager": "1.0.0"
+        "pear/system_daemon": "dev-master"
     }
 }

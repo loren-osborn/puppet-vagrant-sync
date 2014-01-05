@@ -3,21 +3,20 @@
         "This file locks the dependencies of your project to a known state",
         "Read more about it at http://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file"
     ],
-    "hash": "37f029750aafbe3407eb7e91513540f4",
+    "hash": "92764ee38bcc9fde5c2861c437a16bd1",
     "packages": [
         {
-            "name": "liip/process-manager",
-            "version": "1.0.0",
-            "target-dir": "Liip/ProcessManager",
+            "name": "pear/system_daemon",
+            "version": "dev-master",
             "source": {
                 "type": "git",
-                "url": "https://github.com/liip/LiipProcessManager.git",
-                "reference": "33f171608539e6ba71fdd126d744c1432c853e21"
+                "url": "https://github.com/tomglue/system_daemon.git",
+                "reference": "ae868c79312093d5b5174bbe4d93bbf1e8a11466"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/liip/LiipProcessManager/zipball/33f171608539e6ba71fdd126d744c1432c853e21",
-                "reference": "33f171608539e6ba71fdd126d744c1432c853e21",
+                "url": "https://api.github.com/repos/tomglue/system_daemon/zipball/ae868c79312093d5b5174bbe4d93bbf1e8a11466",
+                "reference": "ae868c79312093d5b5174bbe4d93bbf1e8a11466",
                 "shasum": ""
             },
             "require": {
@@ -25,31 +24,13 @@
             },
             "type": "library",
             "autoload": {
-                "psr-0": {
-                    "Liip\\ProcessManager": ""
-                }
+                "classmap": [
+                    "System/Daemon.php"
+                ]
             },
             "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Community contributions",
-                    "homepage": "https://github.com/liip/LiipThemeBundle/contributors"
-                },
-                {
-                    "name": "Liip AG",
-                    "homepage": "http://www.liip.ch/"
-                }
-            ],
-            "description": "Provides a simple locking mechanism based on UNIX process id's written to a PID file.",
-            "keywords": [
-                "locking",
-                "pid",
-                "unix"
-            ],
-            "time": "2013-09-30 13:14:11"
+            "description": "A port of the PEAR class to create Daemons with pure PHP",
+            "time": "2013-02-26 22:44:14"
         }
     ],
     "packages-dev": [
@@ -59,9 +40,9 @@
 
     ],
     "minimum-stability": "stable",
-    "stability-flags": [
-
-    ],
+    "stability-flags": {
+        "pear/system_daemon": 20
+    },
     "platform": [
 
     ],

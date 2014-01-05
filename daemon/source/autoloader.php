@@ -2,6 +2,8 @@
 
 spl_autoload_register(function ($className)
 	{
+		static $loadedFileList = array();
+		$origClassName = $className;
 		$applicationFileNamePrefix  = Phar::running() . '/namespace/';
 		$namespacePrefix = 'LinuxDr\\VagrantSync\\';
 		$fileName 	= '';
@@ -14,8 +16,15 @@ spl_autoload_register(function ($className)
 		$fileName .= str_replace('_', DIRECTORY_SEPARATOR, $className) . '.php';
 		if ($namespacePrefix === substr($namespace . '\\', 0, strlen($namespacePrefix))) {
 			$pathToLoad = $applicationFileNamePrefix . substr($fileName, strlen($namespacePrefix));
-			if (file_exists($pathToLoad)) {
+
+			if (in_array($pathToLoad, $loadedFileList)) {
+				throw new Exception("File $pathToLoad already loaded");
+			} else if (file_exists($pathToLoad)) {
+				$loadedFileList[] = $pathToLoad;
 				include $pathToLoad;
+				if (!class_exists($origClassName, false)) {
+					throw new Exception("Class $origClassName not found in file: $pathToLoad");
+				}
 			} else {
 				throw new Exception("Missing file $pathToLoad");
 			}
