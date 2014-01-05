@@ -174,7 +174,7 @@ class ArchiveTest extends PHPUnit_Framework_TestCase
 						echo '6';
 						class Runner
 						{
-							function __construct($argList)
+							function parseArgs($argList)
 							{
 								echo '9:' . join('.', $argList) . '';
 							}
@@ -227,17 +227,22 @@ MOCK_AUTOLOADER_EOF;
 			class Runner
 			{
 
-				public function __construct($argList)
+				public function __construct()
 				{
 					echo '5';
 				}
 
+				public function parseArgs($argList)
+				{
+					echo '6(' . implode(',', $argList) . ')';
+				}
+
 				public function launch()
 				{
-					echo '6';
-					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(9);
-					echo '10';
-					$other = new SomeClass(15);
+					echo '7';
+					$test = new \LinuxDr\VagrantSync\Nested\Deeply\TestClass(10);
+					echo '11';
+					$other = new SomeClass(16);
 				}
 			}
 			echo '4';
@@ -251,7 +256,7 @@ MOCK_APP_RUNNER_EOF;
 <?php
 			namespace LinuxDr\VagrantSync\Nested\Deeply;
 
-			echo '7';
+			echo '8';
 			class TestClass
 			{
 				function __construct($val)
@@ -259,7 +264,7 @@ MOCK_APP_RUNNER_EOF;
 					echo $val;
 				}
 			}
-			echo '8';
+			echo '9';
 DEEPLY_NESTED_TEST_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'namespace/Nested/Deeply', 0755, true);
 		file_put_contents(
@@ -270,7 +275,7 @@ DEEPLY_NESTED_TEST_EOF;
 <?php
 			namespace Acme\Widget\Module;
 
-			echo '12';
+			echo '13';
 			class SomeClass
 			{
 				function __construct($val)
@@ -279,7 +284,7 @@ DEEPLY_NESTED_TEST_EOF;
 					echo file_get_contents(dirname(dirname(__FILE__)) . DIRECTORY_SEPARATOR . 'acme_file.data');
 				}
 			}
-			echo '13';
+			echo '14';
 OTHER_VENDOR_TEST_EOF;
 		mkdir($this->getDirPath(self::SOURCE_DIR_NAME) . DIRECTORY_SEPARATOR . 'vendor/Acme/Widget/Module', 0755, true);
 		file_put_contents(
@@ -298,7 +303,7 @@ OTHER_VENDOR_TEST_EOF;
 			}
 			spl_autoload_register(function ($className)
 				{
-					echo '11';
+					echo '12';
 					if ($className != 'Acme\\Widget\\Module\\SomeClass') {
 						throw new \Exception("autoloading unexpected class");
 					}
@@ -310,7 +315,7 @@ OTHER_VENDOR_TEST_EOF;
 					if (!class_exists('Acme\\Widget\\Module\\SomeClass', false)) {
 						throw new \Exception("class should exist now");
 					}
-					echo '14';
+					echo '15';
 				});
 			echo '2';
 MOCK_COMPOSER_AUTOLOADER_EOF;
@@ -320,8 +325,8 @@ MOCK_COMPOSER_AUTOLOADER_EOF;
 		);
 		$this->assertFalse(file_exists($this->getArchivePath()), "No archive file yet");
 		exec("php -d phar.readonly=0 source/createPhar.php");
-		$testOupput = exec($this->getArchivePath());
-		$this->assertEquals('123456789101112131415red:green:blue', $testOupput, "Expected stub output");
+		$testOupput = exec($this->getArchivePath() . " a 'b c'");
+		$this->assertEquals('123456(' . $this->getArchivePath() . ',a,b c)78910111213141516red:green:blue', $testOupput, "Expected stub output");
 	}
 
 	public function testCompressedAndSigned()
