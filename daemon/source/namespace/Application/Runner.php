@@ -16,10 +16,13 @@ class Runner
 
 	public function getClassName($shortName)
 	{
-		if ($shortName != 'ArgParser') {
+		$classNameLookup = array(
+			'ArgParser' => 'LinuxDr\\VagrantSync\\Application\\ArgParser',
+			'ProcessManager' => 'LinuxDr\\VagrantSync\\Application\\ProcessManager' );
+		if (!array_key_exists($shortName, $classNameLookup)) {
 			throw new InternalErrorException("Unknown name $shortName");
 		}
-		return 'LinuxDr\\VagrantSync\\Application\\ArgParser';
+		return $classNameLookup[$shortName];
 	}
 
 	public function __call($name, $arguments)
@@ -27,15 +30,7 @@ class Runner
 		$matches = array();
 		if (preg_match('/^getNew(.*)$/', $name, $matches)) {
 			$className = $this->getClassName($matches[1]);
-			if ($className === '') {
-				throw new \Exception("Expected non-empty class-name for short name: {$matches[1]}");
-			}
-			try {
-				$classObj = new ReflectionClass($className);
-			}
-			catch (\Exception $e) {
-				throw new \Exception("got exception for method $name (class shortname {$matches[1]} / Full name {$className}): " . $e->getMessage());
-			}
+			$classObj = new ReflectionClass($className);
 			return $classObj->newInstanceArgs($arguments);
 		}
 		throw new InternalErrorException('Call to undefined method ' . __CLASS__ . "::{$name}()");
@@ -43,6 +38,9 @@ class Runner
 
 	public function launch()
 	{
+		if (!is_object($this->argParser)) {
+			throw new InternalErrorException('Arguments must be parsed first');
+		}
 		echo $this->argParser->getStartupMessage();
 		exit ($this->argParser->getExitCode());
 	}

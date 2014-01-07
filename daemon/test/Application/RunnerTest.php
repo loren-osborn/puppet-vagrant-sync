@@ -29,7 +29,7 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 {
 	public function assertPreConditions()
 	{
-		$this->assertTrue(class_exists('\\LinuxDr\\VagrantSync\\Application\\Runner'), "Test file loading");
+		$this->assertTrue(class_exists('LinuxDr\\VagrantSync\\Application\\Runner'), "Test file loading");
 	}
 
 	public function getExpectedStartupBehaviorsWithoutSideEffects()
@@ -76,43 +76,6 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 		$status = pclose($handle);
 		$this->assertEquals($startupMessage, $output, "expected output '$startupMessage' was actually '$startupMessage'");
 		$this->assertEquals($exitCode, $status, "expected exit code '$exitCode' was actually '$status'");
-	}
-
-	public function testDynamicArgParserClass()
-	{
-		$testRunner = new Runner(array('a'));
-		$this->assertEquals('LinuxDr\\VagrantSync\\Application\\ArgParser', $testRunner->getClassName('ArgParser'), "class name mapper");
-		try {
-			$testRunner->getClassName('Foo');
-			$this->fail("InternalErrorException expected");
-		}
-		catch (InternalErrorException $expected) {
-			$this->assertEquals('Internal Error: Unknown name Foo', $expected->getMessage(), "expected exception");
-		}
-		try {
-			$testRunner->getClassName('Bar');
-			$this->fail("InternalErrorException expected");
-		}
-		catch (InternalErrorException $expected) {
-			$this->assertEquals('Internal Error: Unknown name Bar', $expected->getMessage(), "expected exception");
-		}
-		try {
-			$testRunner->getNewFoo();
-			$this->fail("InternalErrorException expected");
-		}
-		catch (InternalErrorException $expected) {
-			$this->assertEquals('Internal Error: Unknown name Foo', $expected->getMessage(), "expected exception");
-		}
-		$this->assertTrue($testRunner->getNewArgParser(array('a')) instanceof ArgParser, "result of correct class");
-		$this->assertEquals('baz', $testRunner->getNewArgParser(array('baz'))->getOption('executable'), "argument passed");
-		$this->assertEquals('mo bile', $testRunner->getNewArgParser(array('bat', 'mo', 'bile'))->getOption('arg_list'), "arguments passed");
-		try {
-			$testRunner->foo('bar');
-			$this->fail("InternalErrorException expected");
-		}
-		catch (InternalErrorException $expected) {
-			$this->assertEquals('Internal Error: Call to undefined method LinuxDr\VagrantSync\Application\Runner::foo()', $expected->getMessage(), "expected exception");
-		}
 		$proxyDummyArgParser = $this->getMock('stdClass', array('constructorCalled'));
 		$proxyDummyArgParser->expects($this->once())
 			->method('constructorCalled')
@@ -124,5 +87,77 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 			->with($this->equalTo('ArgParser'))
 			->will($this->returnValue('LinuxDir\\VagrantSync\\Test\\Application\\RunnerTest_DummyArgParser'));
 		$this->assertTrue($runnerTestDouble->getNewArgParser(array('joker', 'penguin', 'twoface')) instanceof RunnerTest_DummyArgParser, "result of correct class");
+	}
+
+	public function getBadDynamicClassNames()
+	{
+		return array(
+			array('Foo'),
+			array('Bar'),
+		);
+	}
+
+	public function testDynamicArgParserClass()
+	{
+		$testRunner = new Runner();
+		try {
+			$testRunner->launch();
+			$this->fail("InternalErrorException expected");
+		}
+		catch (InternalErrorException $expected) {
+			$this->assertEquals('Internal Error: Arguments must be parsed first', $expected->getMessage(), "expected exception");
+		}
+		$this->assertEquals('baz', $testRunner->getNewArgParser(array('baz'))->getOption('executable'), "argument passed");
+		$this->assertEquals('mo bile', $testRunner->getNewArgParser(array('bat', 'mo', 'bile'))->getOption('arg_list'), "arguments passed");
+	}
+
+	/**
+	* @dataProvider getBadDynamicClassNames
+	*/
+	public function testBadDynamicClassNames($badName)
+	{
+		$testRunner = new Runner();
+		try {
+			$testRunner->getClassName($badName);
+			$this->fail("InternalErrorException expected");
+		}
+		catch (InternalErrorException $expected) {
+			$this->assertEquals('Internal Error: Unknown name ' . $badName, $expected->getMessage(), "expected exception");
+		}
+		try {
+			$methodName = 'getNew' . $badName;
+			$testRunner->$methodName();
+			$this->fail("InternalErrorException expected");
+		}
+		catch (InternalErrorException $expected) {
+			$this->assertEquals('Internal Error: Unknown name ' . $badName, $expected->getMessage(), "expected exception");
+		}
+		try {
+			$methodName = strtolower($badName);
+			$testRunner->$methodName('bar');
+			$this->fail("InternalErrorException expected");
+		}
+		catch (InternalErrorException $expected) {
+			$this->assertEquals('Internal Error: Call to undefined method LinuxDr\VagrantSync\Application\Runner::' . $methodName . '()', $expected->getMessage(), "expected exception");
+		}
+	}
+
+	public function getDynamicClassMap()
+	{
+		return array(
+			array('ArgParser', 'LinuxDr\\VagrantSync\\Application\\ArgParser', array(array('a'))),
+			array('ProcessManager', 'LinuxDr\\VagrantSync\\Application\\ProcessManager', array())
+		);
+	}
+
+	/**
+	* @dataProvider getDynamicClassMap
+	*/
+	public function testDynamicClasses($shortName, $completeClassName, $instantiationArgs)
+	{
+		$testRunner = new Runner();
+		$this->assertEquals($completeClassName, $testRunner->getClassName($shortName), "class name mapper");
+		$newInstance = call_user_func_array(array($testRunner, 'getNew' . $shortName), $instantiationArgs );
+		$this->assertEquals($completeClassName, get_class($newInstance), "result of correct class");
 	}
 }

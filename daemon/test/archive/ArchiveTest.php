@@ -226,7 +226,6 @@ MOCK_AUTOLOADER_EOF;
 			echo '3';
 			class Runner
 			{
-
 				public function __construct()
 				{
 					echo '5';
