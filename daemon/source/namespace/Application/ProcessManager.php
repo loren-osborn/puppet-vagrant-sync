@@ -1,6 +1,8 @@
 <?php
 namespace LinuxDr\VagrantSync\Application;
 
+use LinuxDr\VagrantSync\Exception\InternalErrorException;
+
 class ProcessManager
 {
 	public function getDaemonClass() {

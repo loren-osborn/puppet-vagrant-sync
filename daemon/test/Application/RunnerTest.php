@@ -86,7 +86,7 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 			->method('getClassName')
 			->with($this->equalTo('ArgParser'))
 			->will($this->returnValue('LinuxDir\\VagrantSync\\Test\\Application\\RunnerTest_DummyArgParser'));
-		$this->assertTrue($runnerTestDouble->getNewArgParser(array('joker', 'penguin', 'twoface')) instanceof RunnerTest_DummyArgParser, "result of correct class");
+		$this->assertTrue($runnerTestDouble->getArgParser(array('joker', 'penguin', 'twoface')) instanceof RunnerTest_DummyArgParser, "result of correct class");
 	}
 
 	public function getBadDynamicClassNames()
@@ -159,5 +159,182 @@ class RunnerTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals($completeClassName, $testRunner->getClassName($shortName), "class name mapper");
 		$newInstance = call_user_func_array(array($testRunner, 'getNew' . $shortName), $instantiationArgs );
 		$this->assertEquals($completeClassName, get_class($newInstance), "result of correct class");
+	}
+
+	public function mockAccessors($className, $accessorValues, $constructorArgs = array(), $extraMockMethods = array())
+	{
+		$mock = $this->getMock($className, array_merge(array_keys($accessorValues), $extraMockMethods), $constructorArgs);
+		foreach ($accessorValues as $method => $value) {
+			$mock->expects($this->any())
+				->method($method)
+				->will($this->returnValue($value));
+		}
+		return $mock;
+	}
+
+	public function mockRunnerForProcessManager($argHash, $processManager, $mainLoop)
+	{
+		$mockArgs = $this->mockAccessors('LinuxDr\\VagrantSync\\Application\\ArgParser', $argHash, array(array('a')));
+		$mockRunner = $this->mockAccessors(
+			'LinuxDr\\VagrantSync\\Application\\Runner',
+				array(
+					'isObjectInitialized' => true,
+					'getArgParser' => $mockArgs,
+					'getProcessManager' => $processManager,
+					'getNewMainLoop' => $mainLoop),
+				array(),
+				array('echoString', 'exitWithStatus'));
+		$this->assertEquals($mockArgs, $mockRunner->getArgParser(array('a')), 'test accessor');
+		$this->assertEquals($processManager, $mockRunner->getProcessManager(), 'test accessor');
+		return $mockRunner;
+	}
+
+	public function testCleanExit()
+	{
+		$procMgrMethods = array('cleanup', 'killRunningProcess', 'launchInForeground', 'launchInBackground');
+		$mockProcMgr = $this->getMock('LinuxDr\\VagrantSync\\Application\\ProcessManager', $procMgrMethods);
+		foreach ($procMgrMethods as $method) {
+			$mockProcMgr->expects($this->never())->method($method);
+		}
+		$mockLoop = $this->getMock('LinuxDr\\VagrantSync\\Application\\MainLoop', array('start'));
+		$mockLoop->expects($this->never())->method('start');
+		$mockRunner = $this->mockRunnerForProcessManager(
+			array(
+				'shouldKillBackgroundProcess' => false,
+				'shouldTerminatOnStartup' => true,
+				'getStartupMessage' => 'red',
+				'getExitCode' => 5
+			),
+			$mockProcMgr,
+			$mockLoop);
+		$mockRunner->expects($this->once())
+			->method('echoString')
+			->with($this->equalTo('red'));
+		$mockRunner->expects($this->once())
+			->method('exitWithStatus')
+			->with($this->equalTo(5))
+			->will($this->throwException(new Exception('Exit with status 5')));
+		try {
+			$mockRunner->launch();
+			$this->fail("exitWithStatus should have thrown exception");
+		}
+		catch (Exception $expected) {
+			$this->assertEquals('Exit with status 5', $expected->getMessage(), "expected exception");
+		}
+	}
+
+	public function getKillPermutations()
+	{
+		return array(
+			array('require' => false, 'exitStatus' => 6, 'outStr' => 'green'),
+			array('require' => true, 'exitStatus' => 7, 'outStr' => 'blue'));
+	}
+
+	/**
+	* @dataProvider getKillPermutations
+	*/
+	public function testKillRunningProcess($require, $exitStatus, $outStr)
+	{
+		$procMgrMethods = array('cleanup', 'killRunningProcess', 'launchInForeground', 'launchInBackground');
+		$mockProcMgr = $this->getMock('LinuxDr\\VagrantSync\\Application\\ProcessManager', $procMgrMethods);
+		$mockProcMgr->expects($this->never())->method('launchInForeground');
+		$mockProcMgr->expects($this->never())->method('launchInBackground');
+		$mockProcMgr->expects($this->once())->method('cleanup');
+		$mockProcMgr->expects($this->once())
+			->method('killRunningProcess')
+			->with($this->equalTo($require));
+		$mockLoop = $this->getMock('LinuxDr\\VagrantSync\\Application\\MainLoop', array('start'));
+		$mockLoop->expects($this->never())->method('start');
+		$mockRunner = $this->mockRunnerForProcessManager(
+			array(
+				'shouldKillBackgroundProcess' => true,
+				'requireProcessToKill' => $require,
+				'shouldTerminatOnStartup' => true,
+				'getStartupMessage' => $outStr,
+				'getExitCode' => $exitStatus
+			),
+			$mockProcMgr,
+			$mockLoop);
+		$mockRunner->expects($this->once())
+			->method('echoString')
+			->with($this->equalTo($outStr));
+		$mockRunner->expects($this->once())
+			->method('exitWithStatus')
+			->with($this->equalTo($exitStatus))
+			->will($this->throwException(new Exception('Exit with status ' . $exitStatus)));
+		try {
+			$mockRunner->launch();
+			$this->fail("exitWithStatus should have thrown exception");
+		}
+		catch (Exception $expected) {
+			$this->assertEquals('Exit with status ' . $exitStatus, $expected->getMessage(), "expected exception");
+		}
+	}
+
+	public function getLaunchPermutations()
+	{
+		$retVal = array();
+		$launchPermutations = array(
+			array('foreground' => false, 'require' => 'launchInBackground', 'prohibit' => 'launchInForeground', 'text' => 'Ooo'),
+			array('foreground' => true, 'require' => 'launchInForeground', 'prohibit' => 'launchInBackground', 'text' => 'Aaa'));
+		$killPermutations = array(
+			array('killRunning' => false, 'requireProcessToKill' => null),
+			array('killRunning' => true, 'requireProcessToKill' => false),
+			array('killRunning' => true, 'requireProcessToKill' => true));
+		foreach ($launchPermutations as $launchPerm) {
+			foreach ($killPermutations as $killPerm) {
+				$retVal[] = array(array_merge($launchPerm, $killPerm));
+			}
+		}
+		return $retVal;
+	}
+
+	/**
+	* @dataProvider getLaunchPermutations
+	*/
+	public function testLaunchPermutations($config)
+	{
+		$procMgrMethods = array('cleanup', 'killRunningProcess', 'launchInForeground', 'launchInBackground');
+		$mockProcMgr = $this->getMock('LinuxDr\\VagrantSync\\Application\\ProcessManager', $procMgrMethods);
+		$mockProcMgr->expects($this->never())
+			->method($config['prohibit']);
+		$mockProcMgr->expects($this->once())
+			->method($config['require']);
+		$mockProcMgr->expects($this->once())
+			->method('cleanup');
+		if ($config['killRunning']) {
+			$mockProcMgr->expects($this->once())
+				->method('killRunningProcess')
+				->with($this->equalTo($config['requireProcessToKill']));
+		} else {
+			$mockProcMgr->expects($this->never())->method('killRunningProcess');
+		}
+		$mockLoop = $this->getMock('LinuxDr\\VagrantSync\\Application\\MainLoop', array('start'));
+		$mockRunner = $this->mockRunnerForProcessManager(
+			array(
+				'shouldKillBackgroundProcess' => $config['killRunning'],
+				'requireProcessToKill' => $config['requireProcessToKill'],
+				'shouldTerminatOnStartup' => false,
+				'shouldStartInForeground' => $config['foreground'],
+				'getStartupMessage' => $config['text']
+			),
+			$mockProcMgr,
+			$mockLoop);
+		$mockRunner->expects($this->once())
+			->method('echoString')
+			->with($this->equalTo($config['text']));
+		$mockRunner->expects($this->never())
+			->method('exitWithStatus');
+		$mockLoop->expects($this->once())
+			->method('start')
+			->with($this->equalTo($mockRunner))
+			->will($this->throwException(new Exception('MainLoop::start() called')));
+		try {
+			$mockRunner->launch();
+			$this->fail("MainLoop::start should have thrown exception");
+		}
+		catch (Exception $expected) {
+			$this->assertEquals('MainLoop::start() called', $expected->getMessage(), "expected exception");
+		}
 	}
 }
