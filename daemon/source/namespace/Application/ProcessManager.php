@@ -18,8 +18,7 @@ class ProcessManager
 	}
 
 	public function getAppPidFile() {
-		$appName =  $this->getAppName();
-		return "/tmp/{$appName}/{$appName}.pid";
+		return $this->getAppRunDir() . '/' . $this->getAppName() . '.pid';
 	}
 
 	public function __call($name, $arguments)
@@ -31,5 +30,26 @@ class ProcessManager
 			return call_user_func_array(array($className, $staticMethodName), $arguments);
 		}
 		throw new InternalErrorException('Call to undefined method ' . __CLASS__ . "::{$name}()");
+	}
+
+	public function getRunningPid() {
+		$retVal = null;
+		if (file_exists($this->getAppPidFile())) {
+			$pidFileContents = file_get_contents($this->getAppPidFile());
+			$matches = array();
+			if (preg_match('/^(0|[1-9]\d*)$/m', $pidFileContents, $matches)) {
+				$output = null;
+				$exitCode = null;
+				exec("ps {$matches[1]}", $output, $exitCode);
+				if ($exitCode == 0) {
+					$retVal = ($matches[1] + 0);
+				}
+			}
+		}
+		return $retVal;
+	}
+
+	public function isAlreadyRunning() {
+		return !is_null($this->getRunningPid());
 	}
 }
